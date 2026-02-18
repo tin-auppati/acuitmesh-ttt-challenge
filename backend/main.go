@@ -32,6 +32,7 @@ func main() {
 			fmt.Println("GET /api/games")
 		})
 		api.POST("/games", CreateGameHandler)
+		api.POST("/games/join", JoinGameHandler)
 	}
 
 	r.Run(":8080") // listen and serve on
