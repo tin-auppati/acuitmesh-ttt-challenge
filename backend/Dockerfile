@@ -1,10 +1,10 @@
 # backend/Dockerfile
-FROM golang:1.22-alpine
+FROM golang:alpine
 
 WORKDIR /app
 
 # Install air for live reload (Optional but recommended for dev)
-RUN go install github.com/cosmtrek/air@latest
+RUN go install github.com/air-verse/air@latest
 
 COPY go.mod ./
 

@@ -3,12 +3,30 @@ package main
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Tic-Tac-Toe Backend is Running!")
+	r := gin.Default()
+
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "pong",
+			"status": "server is running",
+		})
 	})
-	fmt.Println("Server starting on :8080")
-	http.ListenAndServe(":8080", nil)
+	
+	
+	api := r.Group("/api")
+	{
+		api.GET("/games", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"games": []string{"Room 1", "Room 2"},
+			})
+			fmt.Println("GET /api/games")
+		})
+	}
+
+	r.Run(":8080") // listen and serve on
 }
