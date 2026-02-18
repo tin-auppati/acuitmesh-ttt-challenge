@@ -8,16 +8,21 @@ import (
 )
 
 func main() {
+
+	ConnectDB()
+
+	defer DB.Close()
+
 	r := gin.Default()
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
-			"status": "server is running",
+			"status":  "server is running",
+			"db":      "connected",
 		})
 	})
-	
-	
+
 	api := r.Group("/api")
 	{
 		api.GET("/games", func(c *gin.Context) {
@@ -26,6 +31,7 @@ func main() {
 			})
 			fmt.Println("GET /api/games")
 		})
+		api.POST("/games", CreateGameHandler)
 	}
 
 	r.Run(":8080") // listen and serve on
