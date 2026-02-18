@@ -1,0 +1,48 @@
+services:
+  # 1. Database (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    container_name: tictactoe_db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tictactoe
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Backend (Go)
+  backend:
+    build: ./backend
+    container_name: tictactoe_backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_USER: user
+      DB_PASSWORD: password
+      DB_NAME: tictactoe
+      DB_PORT: 5432
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app # Sync file เพื่อแก้ code แล้วไม่ต้อง rebuild ใหม่
+
+  # 3. Frontend (Next.js)
+  frontend:
+    build: ./frontend
+    container_name: tictactoe_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
