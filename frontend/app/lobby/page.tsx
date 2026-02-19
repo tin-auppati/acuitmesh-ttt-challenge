@@ -52,7 +52,7 @@ export default function LobbyPage() {
             }
 
             //ได้ game id มาเข้าไปหน้ากระดานเกม
-            router.push(`/game/${data.game_id}`);
+            router.push(`/game/${data.room_code}`);
         } catch (err: any) {
             setError(err.message)
             setLoading(false)
@@ -79,7 +79,7 @@ export default function LobbyPage() {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`,
                 },
-                body: JSON.stringify({ game_id: parseInt(joinRoomId, 10) }),
+                body: JSON.stringify({ room_code: joinRoomId }),
             });
 
             const data = await res.json();
@@ -156,7 +156,8 @@ export default function LobbyPage() {
             </span>
             <div className="space-y-3">
               <input
-                type="number"
+                type="text"
+                maxLength={6}
                 value={joinRoomId}
                 onChange={(e) => setJoinRoomId(e.target.value)}
                 placeholder="ENTER ROOM ID"

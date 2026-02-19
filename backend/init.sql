@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- 2. ตาราง Games
 CREATE TABLE IF NOT EXISTS games (
     id SERIAL PRIMARY KEY,
+    room_code VARCHAR(6) UNIQUE NOT NULL,
     player1_id INT REFERENCES users(id),
     player2_id INT REFERENCES users(id),
     current_turn_id INT REFERENCES users(id),
