@@ -101,8 +101,8 @@ func JoinGameHandler(c *gin.Context) {
 func MakeMoveHandler(c *gin.Context){
 	var req struct {
 		GameID   int `json:"game_id" binding:"required"`
-		X		int `json:"x"`
-		Y		int `json:"y"`
+		X		int `json:"x" binding:"min=0,max=2"`
+		Y		int `json:"y" binding:"min=0,max=2"`
 
 	}
 	userIDContext, _ := c.Get("userID")
