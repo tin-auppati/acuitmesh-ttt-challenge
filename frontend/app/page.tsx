@@ -16,33 +16,25 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   //ดึง url จาก backend
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
+  //rule realtime check
+  const rules = {
+    userLength: username.length >= 3 && username.length <= 20,
+    userAlphaNum: /^[a-zA-Z0-9]+$/.test(username) && username.length > 0,
+    passLength: password.length >= 6,
+    passMatch: password === confirmPassword && confirmPassword.length > 0,
+  };
+
   const validateForm = () => {
-    // regex username
-    const alphanumericRegex = /^[a-zA-Z0-9]+$/;
-    if (username.length < 3 || username.length > 20){
-      return "Username must be between 3 and 20 characters.";
-    }
-
-    if (!alphanumericRegex.test(username)) {
-      return "Username can only contain letters and numbers.";
-    }
-
-    //validate password
-    if (password.length < 6) {
-      return "Password must be at least 6 characters long.";
-    }
-
-    // confirmation password 
-    if (!isLogin && password !== confirmPassword) {
-      return "Passwords do not match!";
-    }
-
-    return null
-  }
+    if (!rules.userLength) return "Username must be between 3 and 20 characters.";
+    if (!rules.userAlphaNum) return "Username can only contain letters and numbers.";
+    if (!rules.passLength) return "Password must be at least 6 characters long.";
+    if (!isLogin && !rules.passMatch) return "Passwords do not match!";
+    return null;
+  };
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -94,6 +86,15 @@ export default function AuthPage() {
     }
   };
 
+  const CheckIcon = () => (
+    <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+  const DotIcon = () => (
+    <span className="w-4 h-4 mr-2 text-gray-500 flex items-center justify-center text-xs">■</span>
+  );
+
   const EyeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
@@ -124,6 +125,7 @@ export default function AuthPage() {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* USERNAME FIELD */}
           <div>
             <label className="block text-sm font-bold text-gray-300 mb-1 uppercase tracking-wide">
               Username
@@ -135,8 +137,20 @@ export default function AuthPage() {
               className="w-full px-4 py-3 bg-white text-black font-bold border-2 border-white focus:outline-none focus:border-red-600 transition-colors"
               placeholder="PLAYER_1"
             />
+            {/* Checklist สำหรับ Username (แสดงเฉพาะตอน Register) */}
+            {!isLogin && (
+              <div className="mt-2 space-y-1 text-xs font-bold font-mono">
+                <div className={`flex items-center ${rules.userLength ? "text-green-400" : "text-gray-500"}`}>
+                  {rules.userLength ? <CheckIcon /> : <DotIcon />} 3 - 20 Characters
+                </div>
+                <div className={`flex items-center ${rules.userAlphaNum ? "text-green-400" : "text-gray-500"}`}>
+                  {rules.userAlphaNum ? <CheckIcon /> : <DotIcon />} Letters and Numbers only
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* PASSWORD FIELD */}
           <div className="relative">
             <label className="block text-sm font-bold text-gray-300 mb-1 uppercase tracking-wide">
               Password
@@ -157,8 +171,17 @@ export default function AuthPage() {
                 {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
               </button>
             </div>
+            {/* Checklist สำหรับ Password (แสดงเฉพาะตอน Register) */}
+            {!isLogin && (
+              <div className="mt-2 text-xs font-bold font-mono">
+                <div className={`flex items-center ${rules.passLength ? "text-green-400" : "text-gray-500"}`}>
+                  {rules.passLength ? <CheckIcon /> : <DotIcon />} Minimum 6 Characters
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* CONFIRM PASSWORD FIELD (แสดงเฉพาะตอน Register) */}
           {!isLogin && (
             <div className="animate-fade-in relative">
               <label className="block text-sm font-bold text-gray-300 mb-1 uppercase tracking-wide">
@@ -172,13 +195,12 @@ export default function AuthPage() {
                   className="w-full px-4 py-3 pr-12 bg-white text-black font-bold border-2 border-white focus:outline-none focus:border-red-600 transition-colors"
                   placeholder="••••••••"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-red-600 transition-colors"
-                >
-                  {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
-                </button>
+              </div>
+              {/* Checklist สำหรับ Confirm Password */}
+              <div className="mt-2 text-xs font-bold font-mono">
+                <div className={`flex items-center ${rules.passMatch ? "text-green-400" : "text-gray-500"}`}>
+                  {rules.passMatch ? <CheckIcon /> : <DotIcon />} Passwords match
+                </div>
               </div>
             </div>
           )}
@@ -191,7 +213,7 @@ export default function AuthPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (!isLogin && (!rules.userLength || !rules.userAlphaNum || !rules.passLength || !rules.passMatch))}
             className="w-full bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest py-4 px-4 border-2 border-red-600 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
             {loading ? "Processing..." : isLogin ? "Enter Match" : "Create Profile"}
