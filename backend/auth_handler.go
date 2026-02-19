@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtKey = []byte("my_secret_key_tictactoe_key_2026")
+var jwtKey = []byte("super_secret_tictactoe_key_2026")
 
 type Claims struct {
 	UserID int `json:"user_id"`
@@ -47,8 +47,8 @@ func CheckPasswordHash(password, hash string) bool {
 // registerHandler - สมัครสมาชิกใหม่
 func RegisterHandler(c *gin.Context) {
 	var req struct {
-		Username string `json:"username" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		Username string `json:"username" binding:"required,alphanum,min=3,max=20" `
+		Password string `json:"password" binding:"required,min=6"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -77,8 +77,8 @@ func RegisterHandler(c *gin.Context) {
 // loginHandler - เข้าสู่ระบบ
 func LoginHandler(c *gin.Context) {
 	var req struct {
-		Username string `json:"username" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		Username string `json:"username" binding:"required,alphanum,min=3,max=20" `
+		Password string `json:"password" binding:"required,min=6"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

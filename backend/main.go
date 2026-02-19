@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-contrib/cors"
@@ -31,24 +30,22 @@ func main() {
 
 	api := r.Group("/api")
 	{
-		api.GET("/games", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"games": []string{"Room 1", "Room 2"},
-			})
-			fmt.Println("GET /api/games")
-		})
-
 		// --- ระบบ Auth ---
 		api.POST("/register", RegisterHandler)
 		api.POST("/login", LoginHandler)
 
 		// --- ระบบเกม ---
-		api.POST("/games", CreateGameHandler)
-		api.POST("/games/join", JoinGameHandler)
-		api.POST("/games/move", MakeMoveHandler)
+		protected := api.Group("/games")
+		protected.Use(AuthMiddleware())
+		{
+			protected.POST("", CreateGameHandler)
+			protected.POST("/join", JoinGameHandler)
+			protected.POST("/move", MakeMoveHandler)
 
-		api.GET("/games/:id", GetGameHandler)            // ดูสถานะเกม
-		api.GET("/games/:id/moves", GetGameMovesHandler) // ดูประวัติ
+			//ถ้าทัน spectator จะกลับมาแก้
+			protected.GET("/:id", GetGameHandler)            // ดูสถานะเกม
+			protected.GET("/:id/moves", GetGameMovesHandler) // ดูประวัติ
+		}
 	}
 
 	r.Run(":8080") // listen and serve on

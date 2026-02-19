@@ -7,14 +7,8 @@ import (
 )
 
 func CreateGameHandler(c *gin.Context) {
-	var req struct {
-		PlayerID int `json:"player_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	userIDContext, _ := c.Get("userID")
+	playerID := userIDContext.(int)
 
 	var gameID int
 	query := `
@@ -22,7 +16,7 @@ func CreateGameHandler(c *gin.Context) {
 		VALUES ($1, $1, 'WAITING', '---------') 
 		RETURNING id`
 
-	err := DB.QueryRow(query, req.PlayerID).Scan(&gameID)
+	err := DB.QueryRow(query, playerID).Scan(&gameID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create game", "details": err.Error()})
 		return
@@ -38,8 +32,9 @@ func CreateGameHandler(c *gin.Context) {
 func JoinGameHandler(c *gin.Context) {
 	var req struct {
 		GameID   int `json:"game_id" binding:"required"`
-		PlayerID int `json:"player_id" binding:"required"`
 	}
+	userIDContext, _ := c.Get("userID")
+	playerID := userIDContext.(int)
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -69,7 +64,7 @@ func JoinGameHandler(c *gin.Context) {
 	}
 	
 	// 2. validation ต่างๆ เช่น เช็คว่าเกมเต็มหรือยัง เช็คว่าเกมอยู่ในสถานะ WAITING หรือเปล่า เช็คว่า player ที่จะเข้ามาไม่ได้เป็น player1 อยู่แล้ว
-	if p1ID == req.PlayerID {
+	if p1ID == playerID {
 		c.JSON(http.StatusConflict, gin.H{"error": "You are already Player 1"})
 		return
 	}
@@ -84,7 +79,7 @@ func JoinGameHandler(c *gin.Context) {
 
 	// 3. UPDATE เพื่อ set player2_id และเปลี่ยนสถานะเกมเป็น IN_PROGRESS 
 	queryUpdate := `UPDATE games SET player2_id = $1, status = 'IN_PROGRESS' WHERE id = $2` //atomic
-	_, err = tx.Exec(queryUpdate, req.PlayerID, req.GameID)
+	_, err = tx.Exec(queryUpdate, playerID, req.GameID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join game"})
 		return
@@ -106,11 +101,12 @@ func JoinGameHandler(c *gin.Context) {
 func MakeMoveHandler(c *gin.Context){
 	var req struct {
 		GameID   int `json:"game_id" binding:"required"`
-		PlayerID int `json:"player_id" binding:"required"`
 		X		int `json:"x"`
 		Y		int `json:"y"`
 
 	}
+	userIDContext, _ := c.Get("userID")
+	playerID := userIDContext.(int)
 
 	if err := c.ShouldBindJSON(&req) ; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -122,26 +118,26 @@ func MakeMoveHandler(c *gin.Context){
 	defer tx.Rollback()
 
 	// 1. lock
-	var board, statue string
+	var board, status string
 	var p1ID, p2ID, turnID int
 	query := `SELECT board, status, player1_id, player2_id, current_turn_id FROM games WHERE id = $1 FOR UPDATE`
-	err := tx.QueryRow(query, req.GameID).Scan(&board, &statue, &p1ID, &p2ID, &turnID)
+	err := tx.QueryRow(query, req.GameID).Scan(&board, &status, &p1ID, &p2ID, &turnID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Game not found"})
 		return
 	}
 
 	// 2. validation
-	if statue != "IN_PROGRESS" {
+	if status != "IN_PROGRESS" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Game is not in progress"})
 		return
 	}
-	if turnID != req.PlayerID {
+	if turnID != playerID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Not your turn"})
 		return
 	}
 
-	index := req.X*3 + req.Y
+	index := req.Y*3 + req.X
 	if board[index] != '-' {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cell already occupied"})
 		return
@@ -151,7 +147,7 @@ func MakeMoveHandler(c *gin.Context){
 	//3. update board
 	char := "X"
 	nextTurn := p2ID
-	if req.PlayerID == p2ID {
+	if playerID == p2ID {
 		char = "O"
 		nextTurn = p1ID
 	}
@@ -169,7 +165,7 @@ func MakeMoveHandler(c *gin.Context){
 			newStatus = "DRAW"
 		} else {
 			newStatus = "FINISHED"
-			winnerID = &req.PlayerID
+			winnerID = &playerID
 		}
 	}
 
@@ -182,7 +178,7 @@ func MakeMoveHandler(c *gin.Context){
 
 	_, err = tx.Exec(`INSERT INTO moves (game_id, player_id, x, y, move_order) 
              VALUES ($1, $2, $3, $4, (SELECT count(*)+1 FROM moves WHERE game_id=$1))`,
-		req.GameID, req.PlayerID, req.X, req.Y)
+		req.GameID, playerID, req.X, req.Y)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record move"})
 		return
