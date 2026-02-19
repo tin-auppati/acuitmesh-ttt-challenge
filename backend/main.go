@@ -37,6 +37,12 @@ func main() {
 			})
 			fmt.Println("GET /api/games")
 		})
+
+		// --- ระบบ Auth ---
+		api.POST("/register", RegisterHandler)
+		api.POST("/login", LoginHandler)
+
+		// --- ระบบเกม ---
 		api.POST("/games", CreateGameHandler)
 		api.POST("/games/join", JoinGameHandler)
 		api.POST("/games/move", MakeMoveHandler)
