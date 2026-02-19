@@ -34,6 +34,9 @@ func main() {
 		api.POST("/games", CreateGameHandler)
 		api.POST("/games/join", JoinGameHandler)
 		api.POST("/games/move", MakeMoveHandler)
+
+		api.GET("/games/:id", GetGameHandler)       // ดูสถานะเกม
+		api.GET("/games/:id/moves", GetGameMovesHandler) // ดูประวัติ
 	}
 
 	r.Run(":8080") // listen and serve on

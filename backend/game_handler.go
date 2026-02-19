@@ -198,3 +198,48 @@ func MakeMoveHandler(c *gin.Context){
 		"status":  newStatus,
 	})
 }
+
+
+// GetGameHandler - ดูสถานะเกมปัจจุบัน (ใช้สำหรับ Polling)
+func GetGameHandler(c *gin.Context) {
+	gameID := c.Param("id")
+
+	var game Game
+
+	query := `SELECT id, player1_id, player2_id, current_turn_id, board, status, winner_id 
+	          FROM games WHERE id = $1`
+
+	row := DB.QueryRow(query, gameID)
+	err := row.Scan(&game.ID, &game.Player1ID, &game.Player2ID, &game.CurrentTurnID, &game.Board, &game.Status, &game.WinnerID)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Game not found"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, game)
+}
+
+// GetGameMovesHandler - ดูประวัติการเดินของเกม (ใช้สำหรับ Polling)
+func GetGameMovesHandler(c *gin.Context){
+	gameID := c.Param("id")
+
+	rows, err := DB.Query(`SELECT id, game_id, player_id, x, y, created_at 
+	                       FROM moves WHERE game_id = $1 ORDER BY move_order ASC`, gameID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moves"})
+		return
+	}
+
+	defer rows.Close()
+
+	var moves []Move
+	for rows.Next() {
+		var m Move
+		if err := rows.Scan(&m.ID, &m.GameID, &m.PlayerID, &m.X, &m.Y, &m.CreatedAt); err != nil {
+			continue
+		}
+		moves = append(moves, m)
+	}
+	c.JSON(http.StatusOK, gin.H{"moves": moves})
+}
