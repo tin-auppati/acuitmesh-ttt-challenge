@@ -101,3 +101,100 @@ func JoinGameHandler(c *gin.Context) {
 		"status":  "IN_PROGRESS",
 	})
 }
+
+
+func MakeMoveHandler(c *gin.Context){
+	var req struct {
+		GameID   int `json:"game_id" binding:"required"`
+		PlayerID int `json:"player_id" binding:"required"`
+		X		int `json:"x"`
+		Y		int `json:"y"`
+
+	}
+
+	if err := c.ShouldBindJSON(&req) ; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	//atomic ทั้งก้อน begin - commit
+	tx, _ := DB.Begin()
+	defer tx.Rollback()
+
+	// 1. lock
+	var board, statue string
+	var p1ID, p2ID, turnID int
+	query := `SELECT board, status, player1_id, player2_id, current_turn_id FROM games WHERE id = $1 FOR UPDATE`
+	err := tx.QueryRow(query, req.GameID).Scan(&board, &statue, &p1ID, &p2ID, &turnID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Game not found"})
+		return
+	}
+
+	// 2. validation
+	if statue != "IN_PROGRESS" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Game is not in progress"})
+		return
+	}
+	if turnID != req.PlayerID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not your turn"})
+		return
+	}
+
+	index := req.X*3 + req.Y
+	if board[index] != '-' {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cell already occupied"})
+		return
+	}
+
+
+	//3. update board
+	char := "X"
+	nextTurn := p2ID
+	if req.PlayerID == p2ID {
+		char = "O"
+		nextTurn = p1ID
+	}
+
+	newBoard := board[:index] + char + board[index+1:]
+
+	//4. check winner
+	winnerSign := CheckWinner(newBoard)
+	newStatus := "IN_PROGRESS"
+
+	var winnerID *int
+
+	if winnerSign != "" {
+		if winnerSign == "DRAW" {
+			newStatus = "DRAW"
+		} else {
+			newStatus = "FINISHED"
+			winnerID = &req.PlayerID
+		}
+	}
+
+	updateQuery := `UPDATE games SET board = $1, current_turn_id = $2, status = $3, winner_id = $4 WHERE id = $5`
+	_, err = tx.Exec(updateQuery, newBoard, nextTurn, newStatus, winnerID, req.GameID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update game state"})
+		return
+	}
+
+	_, err = tx.Exec(`INSERT INTO moves (game_id, player_id, x, y, move_order) 
+             VALUES ($1, $2, $3, $4, (SELECT count(*)+1 FROM moves WHERE game_id=$1))`,
+		req.GameID, req.PlayerID, req.X, req.Y)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record move"})
+		return
+	}
+	
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Commit failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"board":   newBoard,
+		"status":  newStatus,
+	})
+}
