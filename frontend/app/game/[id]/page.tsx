@@ -473,13 +473,15 @@ export default function GameBoardPage() {
                       onClick={handleRematch}
                       disabled={hasAgreedToRematch || isAbandoned}
                       className={`w-full font-black uppercase tracking-widest py-3 border-4 border-black transition-all ${
-                        hasAgreedToRematch 
-                          ? "bg-gray-400 text-black cursor-wait" 
+                      isAbandoned
+                        ? "bg-black text-red-600 cursor-not-allowed"
+                        : hasAgreedToRematch 
+                          ? "bg-gray-400 text-black cursor-wait shadow-none" 
                           : "bg-green-500 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none"
-                      }`}
+                    }`}
                     >
                       {isAbandoned 
-                        ? "🚫 Opponent Left" 
+                        ? "🚫 OPPONENT LEFT" 
                         : hasAgreedToRematch 
                           ? `⏳ Waiting for Opponent (${rematchCount}/2)` 
                           : `🔄 Rematch (${rematchCount}/2)`}

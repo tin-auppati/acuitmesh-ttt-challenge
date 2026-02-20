@@ -411,7 +411,7 @@ func LeaveGameHandler(c *gin.Context) {
 		} else {
 			winnerID = p1ID
 		}
-		DB.Exec(`UPDATE games SET status = 'FINISHED', winner_id = $1 WHERE id = $2`, winnerID, gameID)
+		DB.Exec(`UPDATE games SET status = 'ABANDONED', winner_id = $1 WHERE id = $2`, winnerID, gameID)
 
 	} else if status == "FINISHED" || status == "DRAW" {
 		// ถ้ากดออกตอนเกมจบแล้ว (ทิ้งหน้าจอ Rematch) -> เปลี่ยนเป็น ABANDONED
