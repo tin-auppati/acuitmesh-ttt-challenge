@@ -96,7 +96,7 @@ export default function GameBoardPage() {
 
   //เดืนหมาก
   const handleMove = async (index: number) => {
-    if(!game || game.status == "IN_PROGRESS" || game.current_turn_id !== myUserId) return;
+    if (!game || game.status !== "IN_PROGRESS" || game.current_turn_id !== myUserId) return;
     if (game.board[index] !== "-") return;
 
     // แปลง index (0-8) เป็น x, y สำหรับส่งให้ Backend
