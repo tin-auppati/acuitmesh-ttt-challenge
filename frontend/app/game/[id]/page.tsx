@@ -74,8 +74,11 @@ export default function GameBoardPage() {
         return;
       }
 
-      const data: GameData = await res.json()
-      setGame(data)
+      const data: GameData = await res.json();
+      setGame((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
+        return data;
+      });
 
       //เข้าผ่าน invite link
       const isPlayer1 = data.player1_id === myUserId;
@@ -107,9 +110,24 @@ export default function GameBoardPage() {
 
   //polling ทุก 1 วินาที
   useEffect(() => {
-    fetchGameState() //เริ่มมาดึงเลย
-    const intervalId = setInterval(fetchGameState, 1000); //ดึงซ้ำทุก 1 วิ
-    return () => clearInterval(intervalId); 
+    let timeoutId: NodeJS.Timeout;
+    let isMounted = true;
+    const poll = async () => {
+      if (!isMounted) return;
+      
+      await fetchGameState(); 
+      
+      if (isMounted) {
+        timeoutId = setTimeout(poll, 1000); 
+      }
+    };
+
+    poll(); 
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId); // ล้างคิวทิ้งตอนกดออกห้อง
+    };
   }, [fetchGameState]);
 
   useEffect(() => {
