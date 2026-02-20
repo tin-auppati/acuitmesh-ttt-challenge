@@ -85,7 +85,12 @@ export default function LobbyPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.error || "Failed to join room");
+              //ถ้าห้องเต็มเข้าไปเป็นผู้ชมได้
+              if (res.status === 409) {
+                router.push(`/game/${joinRoomId}`);
+                return;
+              }
+              throw new Error(data.error || "Failed to join room");
             }
 
             //ถ้าสำเร็จ 
