@@ -328,14 +328,20 @@ export default function GameBoardPage() {
               const isX = cell === "X";
               const isO = cell === "O";
               const isEmpty = cell === "-";
-              
+
+              const isInteractable = isEmpty && isMyTurn && game.status === "IN_PROGRESS" && !isReplaying;
+
               return (
                 <button
                   key={index}
                   onClick={() => handleMove(index)}
-                  disabled={!isEmpty || !isMyTurn || game.status !== "IN_PROGRESS" || isReplaying}
+                  disabled={!isInteractable}
                   className={`w-24 h-24 flex items-center justify-center text-5xl font-black transition-all ${
-                    isEmpty ? "bg-white hover:bg-gray-200 cursor-pointer" : "bg-gray-100 cursor-not-allowed"
+                    isInteractable 
+                      ? "bg-white hover:bg-gray-200 cursor-pointer active:scale-95" // ถ้ากดได้ ให้มี Hover และคลิกยุบตัวได้
+                      : isEmpty 
+                        ? "bg-white cursor-default" // ถ้าเป็นช่องว่างแต่ไม่ใช่ตาเรา/เป็นผู้ชม ให้ใช้ cursor-default ปกติ
+                        : "bg-gray-100 cursor-default" // ช่องที่ถูกกา X/O ไปแล้ว
                   } ${isX ? "text-red-600" : isO ? "text-blue-600" : ""}`}
                 >
                   {isEmpty ? "" : cell}
@@ -379,7 +385,7 @@ export default function GameBoardPage() {
                 </button>
               </div>
             )}
-            
+
 
             {/* ประวัติการเดินแบบ Text (จะโชว์เฉพาะตอนกดดู Replay) */}
             {isReplaying && movesLog.length > 0 && (
