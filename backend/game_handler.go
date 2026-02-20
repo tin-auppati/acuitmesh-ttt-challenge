@@ -217,14 +217,16 @@ func GetGameHandler(c *gin.Context) {
 		Board         string `json:"board"`
 		Status        string `json:"status"`
 		WinnerID      *int   `json:"winner_id"`
+		NextRoomCode  *string `json:"next_room_code"`
+		RematchP1     bool    `json:"rematch_p1"`
+		RematchP2     bool    `json:"rematch_p2"`
 	}
 
-	query := `SELECT id, room_code, player1_id, player2_id, current_turn_id, board, status, winner_id 
+	query := `SELECT id, room_code, player1_id, player2_id, current_turn_id, board, status, winner_id, next_room_code, rematch_p1, rematch_p2 
 			  FROM games WHERE room_code = $1`
 
 	row := DB.QueryRow(query, roomCode)
-	err := row.Scan(&game.ID, &game.RoomCode, &game.Player1ID, &game.Player2ID, &game.CurrentTurnID, &game.Board, &game.Status, &game.WinnerID)
-
+	err := row.Scan(&game.ID, &game.RoomCode, &game.Player1ID, &game.Player2ID, &game.CurrentTurnID, &game.Board, &game.Status, &game.WinnerID, &game.NextRoomCode, &game.RematchP1, &game.RematchP2)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Game not found"})
 		return
@@ -284,4 +286,104 @@ func CancelGameHandler(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Room destroyed successfully"})
+}
+
+
+func RematchHandler(c *gin.Context){
+	roomCode := c.Param("id")
+	userIDContext, _ := c.Get("userID")
+	playerID := userIDContext.(int)
+
+	//Start Transaction
+	tx, err := DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not start transaction"})
+		return
+	}
+
+	defer tx.Rollback()
+
+	var gameID, p1ID int
+	var p2ID *int
+	var status string
+	var nextRoomCode *string
+	var rematchP1, rematchP2 bool
+
+	//ล็อคแถวไว้ป้องกัน rematch พร้อมกัน
+	queryLock := `SELECT id, player1_id, player2_id, status, next_room_code, rematch_p1, rematch_p2 
+	              FROM games WHERE room_code = $1 FOR UPDATE`
+	err = tx.QueryRow(queryLock, roomCode).Scan(&gameID, &p1ID, &p2ID, &status, &nextRoomCode, &rematchP1, &rematchP2)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Game not found"})
+		return
+	}
+
+	//validate เกมจบมั้ย แล้วผู้เล่นห้องนี้กด rematch จริงมั้ย
+	if status != "FINISHED" && status != "DRAW" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Game is not finished yet"})
+		return
+	}
+	isP1 := (playerID == p1ID)
+	isP2 := (p2ID != nil && playerID == *p2ID)
+
+	if !isP1 && !isP2 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a player in this game"})
+		return
+	}
+	
+	// อัปเดตสถานะว่าคนนี้กด Rematch แล้ว
+	if isP1 {
+		rematchP1 = true
+	} else if isP2 {
+		rematchP2 = true
+	}
+
+	//บันทึกลง db
+	updateRematch := `UPDATE games SET rematch_p1 = $1, rematch_p2 = $2 WHERE id = $3`
+	_, err = tx.Exec(updateRematch, rematchP1, rematchP2, gameID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update rematch status"})
+		return
+	}
+
+	if rematchP1 && rematchP2 && nextRoomCode == nil {
+		// ถ้าครบ 2 คนแล้ว ให้สร้างห้องใหม่เลย
+		newRoomCode := GenerateRoomCode()
+		
+		// สลับฝั่ง P1 กับ P2
+		newP1 := p1ID
+		newP2 := p2ID
+		if p2ID != nil {
+			newP1 = *p2ID
+			newP2 = &p1ID
+		}
+
+		var newGameID int
+		insertQuery := `
+			INSERT INTO games (room_code, player1_id, player2_id, current_turn_id, status, board) 
+			VALUES ($1, $2, $3, $2, 'IN_PROGRESS', '---------') 
+			RETURNING id`
+		err = tx.QueryRow(insertQuery, newRoomCode, newP1, newP2).Scan(&newGameID)
+		
+		if err == nil {
+			// อัปเดตห้องเก่า ให้ชี้เป้าไปห้องใหม่
+			tx.Exec(`UPDATE games SET next_room_code = $1 WHERE id = $2`, newRoomCode, gameID)
+			
+			// Commit เลย
+			tx.Commit()
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Both players agreed. Match started!",
+				"status": "2/2",
+				"room_code": newRoomCode,
+			})
+			return
+		}
+	}
+	//ถ้ามีแค่ 1 คน
+	tx.Commit()
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Waiting for opponent...",
+		"status": "1/2",
+	})
+
 }

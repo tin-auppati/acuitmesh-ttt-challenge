@@ -12,6 +12,9 @@ interface GameData {
   board: string;
   status: string;
   winner_id: number | null;
+  next_room_code: string | null; 
+  rematch_p1: boolean;          
+  rematch_p2: boolean;
 }
 
 interface MoveData {
@@ -108,6 +111,12 @@ export default function GameBoardPage() {
     const intervalId = setInterval(fetchGameState, 1000); //ดึงซ้ำทุก 1 วิ
     return () => clearInterval(intervalId); 
   }, [fetchGameState]);
+
+  useEffect(() => {
+    if (game?.next_room_code) {
+      router.push(`/game/${game.next_room_code}`);
+    }
+  }, [game?.next_room_code, router]);
 
   //เดืนหมาก
   const handleMove = async (index: number) => {
@@ -215,6 +224,24 @@ export default function GameBoardPage() {
     return () => clearTimeout(timer);
   }, [isReplaying, isPaused, replayStep, movesLog.length]);
 
+  const handleRematch = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/api/games/${roomCode}/rematch`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to request rematch");
+        return;
+      }
+      fetchGameState();
+    } catch (err: any) {
+      console.error(err);
+    }
+  }
+
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white text-black font-sans">
@@ -302,25 +329,67 @@ export default function GameBoardPage() {
           </div>
 
           {/* ป้ายประกาศผล (ถ้าเกมจบ) */}
-          {game.status === "FINISHED" && (
-            <div className="w-full bg-red-600 text-white text-center p-4 font-black uppercase tracking-widest text-2xl border-4 border-black mb-8 animate-bounce">
-              {game.winner_id === myUserId ? "🏆 VICTORY!" : "☠️ DEFEAT!"}
-            </div>
-          )}
-          {game.status === "DRAW" && (
-            <div className="w-full bg-gray-400 text-black text-center p-4 font-black uppercase tracking-widest text-2xl border-4 border-black mb-8">
+          {!isReplaying && game.status === "FINISHED" && (() => {
+            // 🌟 เช็คว่าใครชนะ และดึงสีประจำตัวมาใช้
+            const isPlayer1Win = game.winner_id === game.player1_id;
+            const winnerName = isPlayer1Win ? "Player 1" : "Player 2";
+            const winnerSymbol = isPlayer1Win ? "X" : "O";
+            const winBgColor = isPlayer1Win ? "bg-red-600" : "bg-blue-600";
+            
+            let message = "";
+            let bgColor = winBgColor; // สีพื้นหลังอิงตามคนชนะเป็นหลัก
+
+            if (mySymbol === "Spectator") {
+              // ถ้าเป็นผู้ชม ให้บอกชัดๆ เลยว่าใครชนะ พร้อมพื้นหลังสีคนนั้น
+              message = `🏆 ${winnerName} (${winnerSymbol}) WINS!`;
+            } else if (game.winner_id === myUserId) {
+              message = "🏆 VICTORY!";
+            } else {
+              message = "☠️ DEFEAT!";
+              bgColor = "bg-gray-800"; // ฝั่งที่แพ้ให้ลดความเด่นลงเป็นสีเทาเข้ม
+            }
+
+            return (
+              <div className={`w-full text-white text-center p-4 font-black uppercase tracking-widest text-2xl border-4 border-black mb-8 animate-bounce ${bgColor}`}>
+                {message}
+              </div>
+            );
+          })()}
+
+          {/* ป้ายกรณีเสมอ (ใช้สีเทาเหมือนกันทุกคน) */}
+          {!isReplaying && game.status === "DRAW" && (
+            <div className="w-full bg-yellow-400 text-black text-center p-4 font-black uppercase tracking-widest text-2xl border-4 border-black mb-8">
               🤝 IT'S A DRAW
             </div>
           )}
 
           {/* ป้ายบอกเทิร์น (ถ้าเกมยังไม่จบ) */}
-          {game.status === "IN_PROGRESS" && (
-            <div className={`w-full text-center p-3 font-black uppercase tracking-widest text-xl border-4 mb-8 transition-colors ${
-              isMyTurn ? "bg-black text-white border-black" : "bg-white text-gray-400 border-gray-300"
-            }`}>
-              {isMyTurn ? "🔥 YOUR TURN" : "OPPONENT'S TURN..."}
-            </div>
-          )}
+          {game.status === "IN_PROGRESS" && (() => {
+            let turnText = "⏳ OPPONENT'S TURN...";
+            let bgColorClass = "bg-white text-gray-400 border-gray-300"; // สีเทาตอนรอเพื่อนเดิน
+
+            if (isMyTurn) {
+              turnText = "🔥 YOUR TURN";
+              bgColorClass = "bg-black text-white border-black"; // สีดำเข้มตอนตาเราเดิน
+            } else if (mySymbol === "Spectator") {
+              // เช็คว่าเป็น Player 1 หรือ 2 ที่กำลังเดินอยู่
+              const isPlayer1Turn = game.current_turn_id === game.player1_id;
+              const activePlayer = isPlayer1Turn ? "Player 1" : "Player 2";
+              const activeSymbol = isPlayer1Turn ? "X" : "O";
+              
+              turnText = `👀 ${activePlayer} (${activeSymbol})'S TURN`;
+              // ใส่สีพื้นหลังแยกชัดเจนให้คนดูเห็นเลย (X แดง, O น้ำเงิน)
+              bgColorClass = isPlayer1Turn 
+                ? "bg-red-600 text-white border-black" 
+                : "bg-blue-600 text-white border-black";
+            }
+
+            return (
+              <div className={`w-full text-center p-3 font-black uppercase tracking-widest text-xl border-4 mb-8 transition-colors ${bgColorClass}`}>
+                {turnText}
+              </div>
+            );
+          })()}
 
           {/* กระดาน Tic-Tac-Toe */}
           <div className="grid grid-cols-3 gap-2 bg-black p-2 border-4 border-black shadow-[8px_8px_0px_0px_rgba(220,38,38,1)]">
@@ -352,14 +421,37 @@ export default function GameBoardPage() {
           
           {/* โซนปุ่มควบคุมหลังจากเกมจบ */}
           <div className="mt-8 flex flex-col w-full space-y-4">
-            {(game.status === "FINISHED" || game.status === "DRAW") && !isReplaying && (
-              <button
-                onClick={handleWatchReplay}
-                className="w-full bg-black text-white font-black uppercase tracking-widest py-3 border-4 border-black shadow-[4px_4px_0px_0px_rgba(220,38,38,1)] hover:translate-y-1 hover:shadow-none transition-all"
-              >
-                🎥 Watch Replay
-              </button>
-            )}
+            {(game.status === "FINISHED" || game.status === "DRAW") && !isReplaying && (() => {
+              // คำนวณสถานะ Rematch
+              const rematchCount = (game.rematch_p1 ? 1 : 0) + (game.rematch_p2 ? 1 : 0);
+              const hasAgreedToRematch = (isPlayer1 && game.rematch_p1) || (isPlayer2 && game.rematch_p2);
+
+              return (
+                <>
+                  {/* ปุ่ม Rematch (โชว์เฉพาะ Player 1 และ 2) */}
+                  {mySymbol !== "Spectator" && (
+                    <button
+                      onClick={handleRematch}
+                      disabled={hasAgreedToRematch}
+                      className={`w-full font-black uppercase tracking-widest py-3 border-4 border-black transition-all ${
+                        hasAgreedToRematch 
+                          ? "bg-gray-400 text-black cursor-wait" 
+                          : "bg-green-500 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none"
+                      }`}
+                    >
+                      {hasAgreedToRematch ? `⏳ Waiting for Opponent (${rematchCount}/2)` : `🔄 Rematch (${rematchCount}/2)`}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={handleWatchReplay}
+                    className="w-full bg-black text-white font-black uppercase tracking-widest py-3 border-4 border-black shadow-[4px_4px_0px_0px_rgba(220,38,38,1)] hover:translate-y-1 hover:shadow-none transition-all"
+                  >
+                    🎥 Watch Replay
+                  </button>
+                </>
+              );
+            })()}
             
             {/* ปุ่มคุม Replay (จะขึ้นมาตอนกำลังฉายซ้ำอยู่เท่านั้น) */}
             {isReplaying && (

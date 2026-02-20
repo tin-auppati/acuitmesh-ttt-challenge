@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS games (
     current_turn_id INT REFERENCES users(id),
     board VARCHAR(9) DEFAULT '---------', -- เก็บเป็น 'XOXO----'
     status VARCHAR(20) DEFAULT 'WAITING', -- WAITING, IN_PROGRESS, FINISHED, DRAW
+    next_room_code VARCHAR(6),  
+    rematch_p1 BOOLEAN NOT NULL DEFAULT FALSE,
+    rematch_p2 BOOLEAN NOT NULL DEFAULT FALSE,
     winner_id INT REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

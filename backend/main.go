@@ -49,6 +49,8 @@ func main() {
 			protected.GET("/:id/moves", GetGameMovesHandler) // ดูประวัติ
 
 			protected.DELETE("/:id", CancelGameHandler) //ทำลายห้อง
+
+			protected.POST("/:id/rematch", RematchHandler)
 		}
 	}
 
