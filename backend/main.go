@@ -47,6 +47,8 @@ func main() {
 			//ถ้าทัน spectator จะกลับมาแก้
 			protected.GET("/:id", GetGameHandler)            // ดูสถานะเกม
 			protected.GET("/:id/moves", GetGameMovesHandler) // ดูประวัติ
+
+			protected.DELETE("/:id", CancelGameHandler) //ทำลายห้อง
 		}
 	}
 

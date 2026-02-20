@@ -262,3 +262,26 @@ func GetGameMovesHandler(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"moves": moves})
 }
+
+func CancelGameHandler(c *gin.Context) {
+	roomCode := c.Param("id")
+	userIDContext, _ := c.Get("userID")
+	playerID := userIDContext.(int)
+
+	//hard delete
+	query := `DELETE FROM games WHERE room_code = $1 AND player1_id = $2 AND status = 'WAITING'`
+	result, err := DB.Exec(query, roomCode, playerID)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel game"})
+		return
+	}
+
+	rowsAffected,_ := result.RowsAffected()
+	//ลบไม่สำเร็จ
+	if rowsAffected == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot cancel this room. It may have already started or you are not the host."})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Room destroyed successfully"})
+}

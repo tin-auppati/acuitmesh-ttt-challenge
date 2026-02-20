@@ -14,6 +14,15 @@ interface GameData {
   winner_id: number | null;
 }
 
+interface MoveData {
+  id: number;
+  game_id: number;
+  player_id: number;
+  x: number;
+  y: number;
+  created_at: string;
+}
+
 export default function GameBoardPage() {
   const router = useRouter()
   const params = useParams(); // ใช้ดึง params.id จาก url
@@ -23,6 +32,12 @@ export default function GameBoardPage() {
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  //replay
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayBoard, setReplayBoard] = useState("---------");
+  const [movesLog, setMovesLog] = useState<MoveData[]>([]);
+  const [replayStep, setReplayStep] = useState(0);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -136,6 +151,72 @@ export default function GameBoardPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  //func cancel match
+  const handleCancelMatch = async () => {
+    if(!confirm("Are you sure you want to cancel this match and destroy the room?")) return;
+
+    const token = localStorage.getItem("token");
+    try {
+      // 🌟 ยิง API DELETE ไปหา Backend
+      const res = await fetch(`${API_URL}/api/games/${roomCode}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        // ถ้าทำลายสำเร็จ พาวาร์ปกลับ Lobby
+        router.push("/lobby");
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to cancel match");
+      }
+
+    }catch (err:any) {
+      console.error(err)
+    }
+  };
+
+  //func replay
+  const handleWatchReplay = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/api/games/${roomCode}/moves`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch move");
+
+      const data = await res.json()
+      const moves: MoveData[] = data.moves || [];
+      setMovesLog(moves);
+
+      //เริ่ม replay
+      setIsReplaying(true);
+      setReplayStep(0);
+      setReplayBoard("---------");
+
+      //จำลองการเดิน 1 วิต่อตา
+      let currentBoardStr = "---------".split("")
+      for (let i = 0; i < moves.length; i++){
+        await new Promise((resolve) => setTimeout(resolve,1000)); //หน่วง 1 วิ
+        const move = moves[i]
+        const index = move.y * 3 + move.x
+
+        //แสดง x o ว่าใครเป็นครเดิน
+        const char = move.player_id === game?.player1_id ? "X" : "O";
+
+        currentBoardStr[index] = char;
+        setReplayBoard(currentBoardStr.join(""));
+        setReplayStep(i + 1);
+      }
+
+    } catch (err: any) {
+      console.error("Replay error:", err);
+      alert("ไม่สามารถโหลดประวัติการเดินได้");
+    }
+  };
+
+
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white text-black font-sans">
@@ -156,6 +237,10 @@ export default function GameBoardPage() {
   const isPlayer2 = game.player2_id === myUserId;
   const isMyTurn = game.current_turn_id === myUserId;
   const mySymbol = isPlayer1 ? "X" : isPlayer2 ? "O" : "Spectator";
+
+  //replay board
+  const displayBoard = isReplaying ? replayBoard : game.board;
+  
   return (
     <div className="min-h-screen flex flex-col items-center py-12 bg-white text-black font-sans selection:bg-red-500 selection:text-white">
       
@@ -177,6 +262,16 @@ export default function GameBoardPage() {
           >
             {copied ? "Link Copied!" : "Copy Invite Link"}
           </button>
+
+          {/* ปุ่มทำลายห้อง (โชว์เฉพาะ Player 1) */}
+          {isPlayer1 && (
+            <button
+              onClick={handleCancelMatch}
+              className="text-gray-500 font-bold uppercase tracking-widest text-sm hover:text-red-600 transition-colors underline underline-offset-4 mt-2"
+            >
+              Cancel Match & Destroy Room
+            </button>
+          )}
         </div>
       )}
 
@@ -217,7 +312,7 @@ export default function GameBoardPage() {
 
           {/* กระดาน Tic-Tac-Toe */}
           <div className="grid grid-cols-3 gap-2 bg-black p-2 border-4 border-black shadow-[8px_8px_0px_0px_rgba(220,38,38,1)]">
-            {game.board.split("").map((cell, index) => {
+            {displayBoard.split("").map((cell, index) => {
               const isX = cell === "X";
               const isO = cell === "O";
               const isEmpty = cell === "-";
@@ -226,7 +321,7 @@ export default function GameBoardPage() {
                 <button
                   key={index}
                   onClick={() => handleMove(index)}
-                  disabled={!isEmpty || !isMyTurn || game.status !== "IN_PROGRESS"}
+                  disabled={!isEmpty || !isMyTurn || game.status !== "IN_PROGRESS" || isReplaying}
                   className={`w-24 h-24 flex items-center justify-center text-5xl font-black transition-all ${
                     isEmpty ? "bg-white hover:bg-gray-200 cursor-pointer" : "bg-gray-100 cursor-not-allowed"
                   } ${isX ? "text-red-600" : isO ? "text-blue-600" : ""}`}
@@ -236,6 +331,38 @@ export default function GameBoardPage() {
               );
             })}
           </div>
+          
+          {/* โซนปุ่มควบคุมหลังจากเกมจบ */}
+          <div className="mt-8 flex flex-col w-full space-y-4">
+            {(game.status === "FINISHED" || game.status === "DRAW") && !isReplaying && (
+              <button
+                onClick={handleWatchReplay}
+                className="w-full bg-black text-white font-black uppercase tracking-widest py-3 border-4 border-black shadow-[4px_4px_0px_0px_rgba(220,38,38,1)] hover:translate-y-1 hover:shadow-none transition-all"
+              >
+                🎥 Watch Replay
+              </button>
+            )}
+
+            {isReplaying && (
+              <button
+                onClick={() => setIsReplaying(false)}
+                className="w-full bg-red-600 text-white font-black uppercase tracking-widest py-3 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all"
+              >
+                ⏹ Stop Replay
+              </button>
+            )}
+
+            {/* ประวัติการเดินแบบ Text (จะโชว์เฉพาะตอนกดดู Replay) */}
+            {isReplaying && movesLog.length > 0 && (
+              <div className="bg-gray-100 border-2 border-black p-4 text-sm font-mono mt-4 max-h-40 overflow-y-auto">
+                <h3 className="font-bold mb-2 border-b-2 border-black pb-1 uppercase">Move History Log</h3>
+                {movesLog.map((m, i) => (
+                  <div key={m.id} className={i + 1 === replayStep ? "bg-yellow-200 font-bold" : "text-gray-600"}>
+                    Step {i + 1}: Player {m.player_id === game.player1_id ? "1 (X)" : "2 (O)"} placed at [Row {m.y}, Col {m.x}]
+                  </div>
+                ))}
+              </div>
+            )}
 
           {/* ปุ่มออกจากห้อง */}
           <button
@@ -244,6 +371,7 @@ export default function GameBoardPage() {
           >
             Leave Arena
           </button>
+          </div>
         </div>
       )}
 
