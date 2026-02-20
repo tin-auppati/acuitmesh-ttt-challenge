@@ -45,7 +45,6 @@ func main() {
 			protected.POST("/join", JoinGameHandler)
 			protected.POST("/move", MakeMoveHandler)
 
-			//ถ้าทัน spectator จะกลับมาแก้
 			protected.GET("/:id", GetGameHandler)            // ดูสถานะเกม
 			protected.GET("/:id/moves", GetGameMovesHandler) // ดูประวัติ
 
