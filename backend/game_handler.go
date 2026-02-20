@@ -387,3 +387,36 @@ func RematchHandler(c *gin.Context){
 	})
 
 }
+
+func LeaveGameHandler(c *gin.Context) {
+	roomCode := c.Param("id")
+	userIDContext, _ := c.Get("userID")
+	playerID := userIDContext.(int)
+
+	var gameID, p1ID int
+	var p2ID *int
+	var status string
+
+	err := DB.QueryRow(`SELECT id, player1_id, player2_id, status FROM games WHERE room_code = $1`, roomCode).Scan(&gameID, &p1ID, &p2ID, &status)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Game not found"})
+		return
+	}
+
+	if status == "IN_PROGRESS" {
+		// ถ้ากดออกกลางเกม = ยอมแพ้ (Surrender) ให้อีกฝั่งชนะทันที
+		var winnerID int
+		if playerID == p1ID && p2ID != nil {
+			winnerID = *p2ID 
+		} else {
+			winnerID = p1ID
+		}
+		DB.Exec(`UPDATE games SET status = 'FINISHED', winner_id = $1 WHERE id = $2`, winnerID, gameID)
+
+	} else if status == "FINISHED" || status == "DRAW" {
+		// ถ้ากดออกตอนเกมจบแล้ว (ทิ้งหน้าจอ Rematch) -> เปลี่ยนเป็น ABANDONED
+		DB.Exec(`UPDATE games SET status = 'ABANDONED' WHERE id = $1`, gameID)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Left the arena"})
+}

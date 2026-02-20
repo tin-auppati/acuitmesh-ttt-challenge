@@ -242,6 +242,26 @@ export default function GameBoardPage() {
     }
   }
 
+  const handleLeaveArena = async () => {
+    
+    if (game?.status === "IN_PROGRESS") {
+      if (!confirm("Are you sure you want to surrender and leave the arena?")) return;
+    }
+
+    //ยิง api บอกฃ
+    const token = localStorage.getItem("token");
+    try {
+      await fetch(`${API_URL}/api/games/${roomCode}/leave`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.error("Failed to notify server about leaving", err);
+    }
+    // วาร์ปกลับ Lobby
+    router.push("/lobby");
+  }
+
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white text-black font-sans">
@@ -329,7 +349,7 @@ export default function GameBoardPage() {
           </div>
 
           {/* ป้ายประกาศผล (ถ้าเกมจบ) */}
-          {!isReplaying && game.status === "FINISHED" && (() => {
+          {!isReplaying && (game.status === "FINISHED" || (game.status === "ABANDONED" && game.winner_id !== null)) && (() => {
             // 🌟 เช็คว่าใครชนะ และดึงสีประจำตัวมาใช้
             const isPlayer1Win = game.winner_id === game.player1_id;
             const winnerName = isPlayer1Win ? "Player 1" : "Player 2";
@@ -357,7 +377,7 @@ export default function GameBoardPage() {
           })()}
 
           {/* ป้ายกรณีเสมอ (ใช้สีเทาเหมือนกันทุกคน) */}
-          {!isReplaying && game.status === "DRAW" && (
+          {!isReplaying && (game.status === "DRAW" || (game.status === "ABANDONED" && game.winner_id === null)) && (
             <div className="w-full bg-yellow-400 text-black text-center p-4 font-black uppercase tracking-widest text-2xl border-4 border-black mb-8">
               🤝 IT'S A DRAW
             </div>
@@ -421,10 +441,11 @@ export default function GameBoardPage() {
           
           {/* โซนปุ่มควบคุมหลังจากเกมจบ */}
           <div className="mt-8 flex flex-col w-full space-y-4">
-            {(game.status === "FINISHED" || game.status === "DRAW") && !isReplaying && (() => {
+            {(game.status === "FINISHED" || game.status === "DRAW" || game.status === "ABANDONED") && !isReplaying && (() => {
               // คำนวณสถานะ Rematch
               const rematchCount = (game.rematch_p1 ? 1 : 0) + (game.rematch_p2 ? 1 : 0);
               const hasAgreedToRematch = (isPlayer1 && game.rematch_p1) || (isPlayer2 && game.rematch_p2);
+              const isAbandoned = game.status === "ABANDONED";
 
               return (
                 <>
@@ -432,14 +453,18 @@ export default function GameBoardPage() {
                   {mySymbol !== "Spectator" && (
                     <button
                       onClick={handleRematch}
-                      disabled={hasAgreedToRematch}
+                      disabled={hasAgreedToRematch || isAbandoned}
                       className={`w-full font-black uppercase tracking-widest py-3 border-4 border-black transition-all ${
                         hasAgreedToRematch 
                           ? "bg-gray-400 text-black cursor-wait" 
                           : "bg-green-500 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none"
                       }`}
                     >
-                      {hasAgreedToRematch ? `⏳ Waiting for Opponent (${rematchCount}/2)` : `🔄 Rematch (${rematchCount}/2)`}
+                      {isAbandoned 
+                        ? "🚫 Opponent Left" 
+                        : hasAgreedToRematch 
+                          ? `⏳ Waiting for Opponent (${rematchCount}/2)` 
+                          : `🔄 Rematch (${rematchCount}/2)`}
                     </button>
                   )}
 
@@ -493,7 +518,7 @@ export default function GameBoardPage() {
 
           {/* ปุ่มออกจากห้อง */}
           <button
-            onClick={() => router.push("/lobby")}
+            onClick={handleLeaveArena}
             className="mt-12 text-gray-500 font-bold uppercase tracking-widest text-sm hover:text-red-600 transition-colors underline underline-offset-4"
           >
             Leave Arena

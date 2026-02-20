@@ -51,6 +51,7 @@ func main() {
 			protected.DELETE("/:id", CancelGameHandler) //ทำลายห้อง
 
 			protected.POST("/:id/rematch", RematchHandler)
+			protected.POST("/:id/leave", LeaveGameHandler)
 		}
 	}
 
