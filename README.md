@@ -6,9 +6,17 @@
 
 ---
 
+## หมายเหตุสำหรับกรรมการ (Note for Reviewers)
+**เรื่องไฟล์ `.env` และ Environment Variables:**
+เพื่อความสะดวกและประหยัดเวลาในการตรวจโปรเจกต์ โค้ดชุดนี้ได้ทำการตั้งค่า Config พื้นฐาน และ Hardcode ค่า Environment Variables ที่จำเป็นบางส่วน (เช่น `JWT_SECRET` และข้อมูลเชื่อมต่อ Database ใน Docker) ไว้ในซอร์สโค้ดและ `docker-compose.yml` เรียบร้อยแล้ว 
+
+ดังนั้น กรรมการจึง **ไม่จำเป็นต้องสร้างหรือตั้งค่าไฟล์ `.env` ด้วยตัวเอง** สามารถใช้คำสั่ง Docker รันโปรเจกต์และเข้าทดสอบระบบได้ทันที (Zero Configuration)
+
+---
+
 ## Live Demo
-- **Frontend URL:** `[link]`
-- **Backend API:** `[link]`
+- **Frontend URL:** `https://your-frontend.vercel.app`
+- **Backend API:** `https://ttt-backend-api.onrender.com`
 
 ---
 
