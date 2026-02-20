@@ -35,7 +35,7 @@ export default function GameBoardPage() {
 
   //replay
   const [isReplaying, setIsReplaying] = useState(false);
-  const [replayBoard, setReplayBoard] = useState("---------");
+  const [isPaused, setIsPaused] = useState(false);
   const [movesLog, setMovesLog] = useState<MoveData[]>([]);
   const [replayStep, setReplayStep] = useState(0);
 
@@ -192,30 +192,28 @@ export default function GameBoardPage() {
 
       //เริ่ม replay
       setIsReplaying(true);
+      setIsPaused(false);
       setReplayStep(0);
-      setReplayBoard("---------");
-
-      //จำลองการเดิน 1 วิต่อตา
-      let currentBoardStr = "---------".split("")
-      for (let i = 0; i < moves.length; i++){
-        await new Promise((resolve) => setTimeout(resolve,1000)); //หน่วง 1 วิ
-        const move = moves[i]
-        const index = move.y * 3 + move.x
-
-        //แสดง x o ว่าใครเป็นครเดิน
-        const char = move.player_id === game?.player1_id ? "X" : "O";
-
-        currentBoardStr[index] = char;
-        setReplayBoard(currentBoardStr.join(""));
-        setReplayStep(i + 1);
-      }
 
     } catch (err: any) {
       console.error("Replay error:", err);
       alert("ไม่สามารถโหลดประวัติการเดินได้");
     }
   };
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    if (isReplaying && !isPaused && replayStep < movesLog.length) {
+      timer = setTimeout(() => {
+        setReplayStep((prev) => prev + 1); // ขยับไป 1 สเต็ป ทุก 1 วิ
+      }, 1000);
+    } else if (isReplaying && replayStep === movesLog.length) {
+      setIsPaused(true);
+    }
 
+    // Cleanup เวลากด Pause หรือ Component Unmount
+    return () => clearTimeout(timer);
+  }, [isReplaying, isPaused, replayStep, movesLog.length]);
 
   if (error) {
     return (
@@ -239,8 +237,22 @@ export default function GameBoardPage() {
   const mySymbol = isPlayer1 ? "X" : isPlayer2 ? "O" : "Spectator";
 
   //replay board
-  const displayBoard = isReplaying ? replayBoard : game.board;
-  
+  const getDisplayBoard = () => {
+    //โหมดปกติ
+    if(!isReplaying) return game.board
+
+    //โหมด replay
+    let boardArr = "---------".split("");
+    for (let i = 0; i < replayStep; i++) {
+      const move = movesLog[i];
+      const char = move.player_id === game.player1_id ? "X" : "O";
+      boardArr[move.y * 3 + move.x] = char;
+    }
+    return boardArr.join("");
+  }
+
+  const displayBoard = getDisplayBoard();
+   
   return (
     <div className="min-h-screen flex flex-col items-center py-12 bg-white text-black font-sans selection:bg-red-500 selection:text-white">
       
@@ -342,15 +354,32 @@ export default function GameBoardPage() {
                 🎥 Watch Replay
               </button>
             )}
-
+            
+            {/* ปุ่มคุม Replay (จะขึ้นมาตอนกำลังฉายซ้ำอยู่เท่านั้น) */}
             {isReplaying && (
-              <button
-                onClick={() => setIsReplaying(false)}
-                className="w-full bg-red-600 text-white font-black uppercase tracking-widest py-3 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all"
-              >
-                ⏹ Stop Replay
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  // ถ้าย้อนกลับไปดูตอนที่มันจบไปแล้ว (replayStep === movesLog.length) พอกดปุ่มนี้ให้รีเซ็ตกลับไปหน้า 0 ใหม่
+                  onClick={() => {
+                    if (replayStep === movesLog.length) setReplayStep(0);
+                    setIsPaused(!isPaused);
+                  }}
+                  className={`flex-1 font-black uppercase tracking-widest py-3 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all ${
+                    isPaused ? "bg-green-500 text-black" : "bg-yellow-400 text-black"
+                  }`}
+                >
+                  {isPaused ? "▶ Resume" : "⏸ Pause"}
+                </button>
+
+                <button
+                  onClick={() => setIsReplaying(false)}
+                  className="flex-1 bg-red-600 text-white font-black uppercase tracking-widest py-3 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all"
+                >
+                  ⏹ Stop
+                </button>
+              </div>
             )}
+            
 
             {/* ประวัติการเดินแบบ Text (จะโชว์เฉพาะตอนกดดู Replay) */}
             {isReplaying && movesLog.length > 0 && (
