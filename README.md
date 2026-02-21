@@ -94,9 +94,15 @@ CONSTRAINT unique_move_per_cell UNIQUE (game_id, x, y)
 
 โครงสร้าง Database แบบ Relational ถูกออกแบบมา 3 ตารางหลัก เพื่อรองรับการทำ Audit Log และระบบ Replay:
 
-* **`users`**: เก็บข้อมูลผู้เล่น `(id, username, password_hash, created_at)`
-* **`games`**: จัดการสถานะห้องเกม, ผู้เล่น, เทิร์นปัจจุบัน, และสถานะการกดยอมรับ Rematch `(id, room_code, player1_id, player2_id, current_turn_id, status, board, winner_id, next_room_code, rematch_p1, rematch_p2)`
-* **`moves`**: ประวัติการเดินหมาก (Ledger) สำหรับฟีเจอร์ Replay โดยเก็บพิกัดและลำดับการเดินทุกตา `(id, game_id, player_id, x, y, move_order)`
+* **`users`**: เก็บข้อมูลผู้เล่นและการยืนยันตัวตน
+    * `id`, `username`, `password_hash`, `created_at`
+* **`games`**: จัดการข้อมูลห้องเกม, State ของกระดาน, และระบบ Rematch
+    * `id`, `room_code`, `board`, `status`, `next_room_code`, `rematch_p1`, `rematch_p2`, `created_at`
+    * *Relations:* `player1_id`, `player2_id`, `current_turn_id`, `winner_id` อ้างอิง (Foreign Key) ไปยัง `users(id)`
+* **`moves`**: ประวัติการเดินหมาก (Ledger) สำหรับฟีเจอร์ Replay และตรวจสอบความถูกต้อง
+    * `id`, `x`, `y`, `move_order`, `created_at`
+    * *Relations:* `game_id` อ้างอิงไปที่ `games(id)` แบบ `ON DELETE CASCADE` และ `player_id` อ้างอิงไปที่ `users(id)`
+    * *Constraint Protection:* มีการทำ `CONSTRAINT unique_move_per_cell UNIQUE (game_id, x, y)` เพื่อทำหน้าที่เป็น Data Integrity Layer ป้องกันบั๊กการเดินหมากซ้อนทับกันในระดับ Database
 
 ---
 
