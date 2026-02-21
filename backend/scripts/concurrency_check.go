@@ -92,17 +92,54 @@ func main() {
 	}
 
 	// เช็คคีย์ "game_id" ให้ตรงกับที่ API Return ออกมา
-	gameIDFloat, ok := gameResp["game_id"].(float64)
+	roomCode, ok := gameResp["room_code"].(string)
 	if !ok {
-		if id, ok2 := gameResp["id"].(float64); ok2 {
-			gameIDFloat = id
-		} else {
-			fmt.Println("Cannot extract game_id from response:", gameResp)
-			return
-		}
+		fmt.Println("Cannot extract room_code from response:", gameResp)
+		return
 	}
-	gameID := int(gameIDFloat)
-	fmt.Println("Game Created! ID: %d\n\n", gameID)
+
+	fmt.Printf("Game Created! Room Code: %s\n\n", roomCode)
+
+	fmt.Printf("[3.5/4] Creating Player 2 to join the game...\n")
+    testUser2 := fmt.Sprintf("player2%d", rand.Intn(100000)) 
+    
+    // Register Player 2
+    _, err = sendRequest("POST", baseURL+"/register", map[string]interface{}{
+        "username": testUser2,
+        "password": testPass,
+    }, "")
+    if err != nil {
+        fmt.Println("Player 2 Register Failed:", err)
+        return
+    }
+
+    // Login Player 2
+    loginResp2, err := sendRequest("POST", baseURL+"/login", map[string]interface{}{
+        "username": testUser2,
+        "password": testPass,
+    }, "")
+    if err != nil {
+        fmt.Println("Player 2 Login Failed:", err)
+        return
+    }
+    
+    // ดึง Token ของ Player 2
+    token2, ok := loginResp2["token"].(string)
+    if !ok {
+        fmt.Println("Cannot extract token for Player 2")
+        return
+    }
+
+    // Player 2 Join Room ด้วย roomCode
+    _, err = sendRequest("POST", baseURL+"/games/join", map[string]interface{}{
+        "room_code": roomCode, 
+    }, token2)
+
+    if err != nil {
+        fmt.Println("Player 2 Join Failed:", err)
+        return
+    }
+    fmt.Println("Player 2 joined successfully! Game is now IN_PROGRESS.")
 
 	fmt.Printf("[4/4] FIRING CONCURRENT REQUESTS (Race Condition Test)\n")
 	requestsCount := 20
@@ -111,9 +148,9 @@ func main() {
 	var failCount int32
 
 	movePayload, _ := json.Marshal(map[string]interface{}{
-		"game_id": gameID,
-		"x":       0,
-		"y":       0,
+		"room_code": roomCode,
+		"x":         0,
+		"y":         0,
 	})
 
 	startSignal := make(chan struct{})
