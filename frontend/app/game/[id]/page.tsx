@@ -35,6 +35,7 @@ export default function GameBoardPage() {
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [hasPromptedSpectator, setHasPromptedSpectator] = useState(false);  
 
   //replay
   const [isReplaying, setIsReplaying] = useState(false);
@@ -57,6 +58,26 @@ export default function GameBoardPage() {
     if (storedUserId) setMyUserId(parseInt(storedUserId, 10));
   }, [router]);
 
+  useEffect(() => {
+    if (game && myUserId && !hasPromptedSpectator) {
+      const isPlayer1 = game.player1_id === myUserId;
+      const isPlayer2 = game.player2_id === myUserId;
+      const isRoomFull = game.player2_id !== null; // ห้องมีคนครบ 2 คนแล้ว
+
+      // ถ้าเราไม่ใช่ P1, ไม่ใช่ P2 และห้องเต็มแล้ว (หรือเริ่มเกมไปแล้ว) = เราคือคนที่ 3 เป็นต้นไป
+      if (!isPlayer1 && !isPlayer2 && isRoomFull) {
+        setHasPromptedSpectator(true); // มาร์คไว้ว่าถามแล้ว จะได้ไม่เด้งซ้ำตอน Polling ทำงาน
+        
+        // เด้งถามความสมัครใจ
+        const wantsToWatch = window.confirm("This room is already full or in progress. Do you want to enter as a Spectator?");
+        
+        if (!wantsToWatch) {
+          router.push("/lobby"); // ถ้าไม่อยากดู เตะกลับหน้า Lobby
+        }
+      }
+    }
+  }, [game, myUserId, hasPromptedSpectator, router]);
+  
   const [notFoundCount, setNotFoundCount] = useState(0);
   //polling
   const fetchGameState = useCallback(async () => {

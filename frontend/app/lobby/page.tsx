@@ -112,8 +112,14 @@ export default function LobbyPage() {
 
             if (!res.ok) {
               //ถ้าห้องเต็มเข้าไปเป็นผู้ชมได้
-              if (res.status === 409) {
-                router.push(`/game/${joinRoomId}`);
+              if (res.status === 409 && (data.error === "Room is full" || data.error === "Game is already in progress")) {
+                // เด้ง Popup ถามผู้เล่น
+                const wantsToSpectate = window.confirm(`${data.error}. Do you want to enter as a Spectator?`);
+                if (wantsToSpectate) {
+                  router.push(`/game/${joinRoomId}`);
+                } else {
+                  setLoading(false); // ถ้ากด Cancel ให้ปลดโหลด
+                }
                 return;
               }
               throw new Error(data.error || "Failed to join room");
