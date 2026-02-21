@@ -450,3 +450,20 @@ func LeaveGameHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Left the arena"})
 }
+
+
+func GetMyActiveGameHandler(c *gin.Context) {
+	userIDContext, _ := c.Get("userID")
+	playerID := userIDContext.(int)
+
+	var roomCode string
+	query := `SELECT room_code FROM games WHERE (player1_id = $1 OR player2_id = $1) AND status IN ('WAITING', 'IN_PROGRESS') LIMIT 1`
+	err := DB.QueryRow(query, playerID).Scan(&roomCode)
+
+	if err != nil { // ถ้าหาไม่เจอ (ไม่มีห้องค้าง)
+		c.JSON(http.StatusOK, gin.H{"has_active_game": false})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"has_active_game": true, "room_code": roomCode})
+}

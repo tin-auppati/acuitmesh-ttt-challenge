@@ -2,6 +2,7 @@
 
 import { useState,useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { RouteMatcher } from "next/dist/server/route-matchers/route-matcher";
 
 export default function LobbyPage() {
     const router = useRouter()
@@ -23,6 +24,31 @@ export default function LobbyPage() {
             setUsername(storedUser || "Player")
         }
     }, [router]);
+
+    // เช็คว่ามีเกมที่ค้างอยู่ (Zombie Session) ไหม ถ้ามีให้ดึงตัวกลับไป
+    useEffect(() => {
+      const checkZombieSession = async () => {
+        const token = localStorage.getItem("token");
+          if (!token) return;
+          
+          try {
+            const res = await fetch(`${API_URL}/api/games/me/active`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if(data.has_active_game) {
+              alert("You have an ongoing match! Reconnecting to the arena...");
+              router.push(`/game/${data.room_code}`);
+            }
+          } catch (err:any) {
+            console.error("Failed to check active game", err);
+          }
+      };
+      checkZombieSession();
+    }, [router, API_URL]);
 
     //logout 
     const handleLogout = () => {

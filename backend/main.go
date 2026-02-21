@@ -52,6 +52,7 @@ func main() {
 
 			protected.POST("/:id/rematch", RematchHandler)
 			protected.POST("/:id/leave", LeaveGameHandler)
+			protected.GET("/me/active", GetMyActiveGameHandler)
 		}
 	}
 
