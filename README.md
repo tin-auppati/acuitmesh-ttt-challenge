@@ -28,6 +28,19 @@
 
 ---
 
+## Key Technical Features
+
+### 1. Active Session Protection (Anti-Cheat)
+ระบบมีการตรวจสอบสถานะผู้เล่นแบบ Real-time เพื่อป้องกันการสร้างห้องหรือจอยห้องซ้ำซ้อน (1 User : 1 Active Game) หากผู้เล่นมีเกมที่อยู่ในสถานะ `WAITING` หรือ `IN_PROGRESS` ระบบจะไม่อนุญาตให้เริ่มเกมใหม่จนกว่าจะจบเกมเดิมหรือกด Leave Arena ก่อน
+
+### 2. Pessimistic Locking (Server-Side)
+ใช้ท่า `SELECT ... FOR UPDATE` ภายใน Database Transaction เพื่อล็อกแถวข้อมูลเกมขณะประมวลผลตาเดิน การันตีว่าไม่มีทางเกิดการ "เล่นซ้อนตา" หรือ "ลงหมากทับกัน" แม้จะมีการส่งข้อมูลเข้ามาพร้อมกันก็ตาม
+
+### 3. Robust Polling & Ghost 404 Handling
+ในระบบที่ใช้ Short Polling มักเกิดปัญหา Race Condition ตอนเปลี่ยนหน้าห้อง (เช่น หลัง Rematch) ผมได้เพิ่ม **Retry Logic** ที่ฝั่ง Frontend เพื่อจัดการปัญหา 404 ชั่วคราว (Ghost 404) ทำให้การเปลี่ยนผ่านระหว่างห้องเกมลื่นไหลและมั่นคงขึ้น
+
+---
+
 ## Architecture & System Design
 
 เพื่อให้เป็นไปตามข้อบังคับ "ไม่อนุญาตให้ใช้การสื่อสารแบบ Realtime" และ "Server ต้องเป็น Single Source of Truth" ระบบจึงถูกออกแบบดังนี้:
