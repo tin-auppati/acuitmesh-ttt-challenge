@@ -57,6 +57,7 @@ export default function GameBoardPage() {
     if (storedUserId) setMyUserId(parseInt(storedUserId, 10));
   }, [router]);
 
+  const [notFoundCount, setNotFoundCount] = useState(0);
   //polling
   const fetchGameState = useCallback(async () => {
     const token = localStorage.getItem("token");
@@ -69,11 +70,15 @@ export default function GameBoardPage() {
 
       if (!res.ok){
         if (res.status === 404) {
-          setError("Room not found or has been destroyed.");
+          // ให้ลองสะสมแต้มไว้ก่อน ถ้าเจอติดกันเกิน 3-5 วินาที ค่อยถือว่าพังจริง
+          setNotFoundCount((prev) => prev + 1);
+          if (notFoundCount > 3) {
+            setError("Room not found or has been destroyed.");
+          }
         }
         return;
       }
-
+      setNotFoundCount(0);
       const data: GameData = await res.json();
       setGame((prev) => {
         if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
@@ -90,7 +95,7 @@ export default function GameBoardPage() {
       console.error("Polling error:", err);
     }
     
-  }, [API_URL, roomCode, myUserId]);
+  }, [API_URL, roomCode, myUserId, notFoundCount]);
 
   const autoJoinMatch = async (token: string) => {
     try {
@@ -249,12 +254,19 @@ export default function GameBoardPage() {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
+
         alert(data.error || "Failed to request rematch");
         return;
       }
-      fetchGameState();
+      if (data.room_code) {
+        router.push(`/game/${data.room_code}`);
+      } else {
+        // ถ้าเรากดคนแรก (รอเพื่อน) ก็ค่อย fetchState ปกติ
+        fetchGameState();
+      }
     } catch (err: any) {
       console.error(err);
     }

@@ -33,6 +33,6 @@ func CheckWinner(b string) (string) {
 		return "DRAW"
 	}
 
-	return "" //เกมยังไม่ตบ 
+	return "" //เกมยังไม่จบ 
 }
 
