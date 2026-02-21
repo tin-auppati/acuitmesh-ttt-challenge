@@ -15,8 +15,8 @@
 ---
 
 ## Live Demo
-- **Frontend URL:** `https://your-frontend.vercel.app`
-- **Backend API:** `https://ttt-backend-api.onrender.com`
+- **Frontend URL:** `https://acuitmesh-ttt-challenge.vercel.app`
+- **Backend API:** `https://ttt-backend-docker.onrender.com`
 
 ---
 
@@ -55,6 +55,12 @@
 ---
 
 ## Concurrency & Race Condition Handling
+
+เพื่อพิสูจน์ว่าระบบสามารถจัดการกับ Race Condition ได้จริงแบบ 100% (เช่น ผู้เล่นพยายามกดย้ำๆ ในช่องเดียวกัน หรือมีการใช้ Bot ยิง Request เข้ามาพร้อมกันในเสี้ยววินาที) โปรเจกต์นี้มาพร้อมกับสคริปต์ทดสอบอัตโนมัติ
+**วิธีการรันสคริปต์ทดสอบ (How to test):**
+```bash
+go run backend/scripts/concurrency_check.go
+```
 
 การจัดการปัญหา Race Condition (เช่น ผู้เล่นพยายามเดินในช่องเดียวกันพร้อมกัน, กดย้ำๆ หรือการใช้ Bot ยิง Request รัวๆ) ถูกป้องกันด้วยสถาปัตยกรรม **Dual-Layer Protection (การป้องกัน 2 ชั้น)**:
 
