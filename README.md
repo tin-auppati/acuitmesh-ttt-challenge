@@ -39,6 +39,9 @@
 ### 3. Robust Polling & Ghost 404 Handling
 ในระบบที่ใช้ Short Polling มักเกิดปัญหา Race Condition ตอนเปลี่ยนหน้าห้อง (เช่น หลัง Rematch) ผมได้เพิ่ม **Retry Logic** ที่ฝั่ง Frontend เพื่อจัดการปัญหา 404 ชั่วคราว (Ghost 404) ทำให้การเปลี่ยนผ่านระหว่างห้องเกมลื่นไหลและมั่นคงขึ้น
 
+### 4. Auto-Reconnect & Zombie Session Mitigation
+เนื่องจากโปรเจกต์นี้ใช้สถาปัตยกรรมแบบ Stateless RESTful API (ไม่มี WebSocket) หากผู้เล่นปิดเบราว์เซอร์หนี เน็ตหลุด หรือแบตหมดกะทันหัน สถานะเกมจะค้างอยู่ใน Database (Zombie Session) ส่งผลให้ผู้เล่นโดน Soft-locked 
+* **Solution:** ระบบได้รับการออกแบบให้มีกลไก **Auto-Reconnect** โดยทุกครั้งที่ผู้เล่นเข้าสู่หน้า Lobby หรือ Login เข้ามาใหม่ ระบบจะยิงเช็ค `Active Session` ทันที หากพบว่ามีเกมที่ค้างอยู่ (สถานะ `IN_PROGRESS` หรือ `WAITING`) ระบบจะแจก Alert แจ้งเตือนและ **"บังคับ Redirect (วาร์ป)"** ผู้เล่นคนนั้นกลับเข้าสู่กระดานเดิมที่ค้างอยู่โดยอัตโนมัติ เพื่อให้เขาสามารถเล่นต่อ หรือกดปุ่ม Leave Arena เพื่อเคลียร์ห้องได้อย่างถูกต้อง
 ---
 
 ## Architecture & System Design
