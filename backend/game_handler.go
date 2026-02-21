@@ -19,6 +19,21 @@ func CreateGameHandler(c *gin.Context) {
 	userIDContext, _ := c.Get("userID")
 	playerID := userIDContext.(int)
 
+	var activeCount int
+	checkQuery := `
+		SELECT count(*) FROM games 
+		WHERE (player1_id = $1 OR player2_id = $1) 
+		AND status IN ('WAITING', 'IN_PROGRESS')`
+
+	err := DB.QueryRow(checkQuery, playerID).Scan(&activeCount)
+
+	if activeCount > 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "You already have an active game session. Please finish or leave it first.",
+		})
+		return
+	}
+
 	roomCode := GenerateRoomCode()
 
 	var gameID int
@@ -27,11 +42,12 @@ func CreateGameHandler(c *gin.Context) {
 		VALUES ($1, $2, $2, 'WAITING', '---------') 
 		RETURNING id`
 
-	err := DB.QueryRow(query, roomCode, playerID).Scan(&gameID)
+	err = DB.QueryRow(query, roomCode, playerID).Scan(&gameID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create game", "details": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message":   "Game created successfully",
 		"room_code": roomCode,
@@ -59,6 +75,21 @@ func JoinGameHandler(c *gin.Context) {
 
 	// ถ้าเกิดอะไรขึ้นผิดพลาดให้ Rollback เสมอ
 	defer tx.Rollback()
+
+	var activeCount int
+	checkQuery := `
+		SELECT count(*) FROM games 
+		WHERE (player1_id = $1 OR player2_id = $1) 
+		AND status IN ('WAITING', 'IN_PROGRESS')`
+
+	err = DB.QueryRow(checkQuery, playerID).Scan(&activeCount)
+
+	if activeCount > 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "You already have an active game session. Please finish or leave it first.",
+		})
+		return
+	}
 
 	// 1. SELECT ... FOR UPDATE เพื่อ Lock แถวเกมนั้นไว้ก่อน
 	var gameID, p1ID int
@@ -209,14 +240,14 @@ func GetGameHandler(c *gin.Context) {
 	roomCode := c.Param("id")
 
 	var game struct {
-		ID            int    `json:"id"`
-		RoomCode      string `json:"room_code"`
-		Player1ID     int    `json:"player1_id"`
-		Player2ID     *int   `json:"player2_id"`
-		CurrentTurnID int    `json:"current_turn_id"`
-		Board         string `json:"board"`
-		Status        string `json:"status"`
-		WinnerID      *int   `json:"winner_id"`
+		ID            int     `json:"id"`
+		RoomCode      string  `json:"room_code"`
+		Player1ID     int     `json:"player1_id"`
+		Player2ID     *int    `json:"player2_id"`
+		CurrentTurnID int     `json:"current_turn_id"`
+		Board         string  `json:"board"`
+		Status        string  `json:"status"`
+		WinnerID      *int    `json:"winner_id"`
 		NextRoomCode  *string `json:"next_room_code"`
 		RematchP1     bool    `json:"rematch_p1"`
 		RematchP2     bool    `json:"rematch_p2"`
@@ -279,7 +310,7 @@ func CancelGameHandler(c *gin.Context) {
 		return
 	}
 
-	rowsAffected,_ := result.RowsAffected()
+	rowsAffected, _ := result.RowsAffected()
 	//ลบไม่สำเร็จ
 	if rowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot cancel this room. It may have already started or you are not the host."})
@@ -288,8 +319,7 @@ func CancelGameHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Room destroyed successfully"})
 }
 
-
-func RematchHandler(c *gin.Context){
+func RematchHandler(c *gin.Context) {
 	roomCode := c.Param("id")
 	userIDContext, _ := c.Get("userID")
 	playerID := userIDContext.(int)
@@ -330,7 +360,7 @@ func RematchHandler(c *gin.Context){
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a player in this game"})
 		return
 	}
-	
+
 	// อัปเดตสถานะว่าคนนี้กด Rematch แล้ว
 	if isP1 {
 		rematchP1 = true
@@ -349,7 +379,7 @@ func RematchHandler(c *gin.Context){
 	if rematchP1 && rematchP2 && nextRoomCode == nil {
 		// ถ้าครบ 2 คนแล้ว ให้สร้างห้องใหม่เลย
 		newRoomCode := GenerateRoomCode()
-		
+
 		// สลับฝั่ง P1 กับ P2
 		newP1 := p1ID
 		newP2 := p2ID
@@ -364,16 +394,16 @@ func RematchHandler(c *gin.Context){
 			VALUES ($1, $2, $3, $2, 'IN_PROGRESS', '---------') 
 			RETURNING id`
 		err = tx.QueryRow(insertQuery, newRoomCode, newP1, newP2).Scan(&newGameID)
-		
+
 		if err == nil {
 			// อัปเดตห้องเก่า ให้ชี้เป้าไปห้องใหม่
 			tx.Exec(`UPDATE games SET next_room_code = $1 WHERE id = $2`, newRoomCode, gameID)
-			
+
 			// Commit เลย
 			tx.Commit()
 			c.JSON(http.StatusOK, gin.H{
-				"message": "Both players agreed. Match started!",
-				"status": "2/2",
+				"message":   "Both players agreed. Match started!",
+				"status":    "2/2",
 				"room_code": newRoomCode,
 			})
 			return
@@ -383,7 +413,7 @@ func RematchHandler(c *gin.Context){
 	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Waiting for opponent...",
-		"status": "1/2",
+		"status":  "1/2",
 	})
 
 }
@@ -407,7 +437,7 @@ func LeaveGameHandler(c *gin.Context) {
 		// ถ้ากดออกกลางเกม = ยอมแพ้ (Surrender) ให้อีกฝั่งชนะทันที
 		var winnerID int
 		if playerID == p1ID && p2ID != nil {
-			winnerID = *p2ID 
+			winnerID = *p2ID
 		} else {
 			winnerID = p1ID
 		}
